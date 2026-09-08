@@ -885,8 +885,8 @@ struct PatchProjectDetailView: View {
                         Button(action: prepareExport) {
                             actionLabel("patch.export", systemImage: "square.and.arrow.up")
                         }
+                        .disabled(isWorking)
                     }
-                    .disabled(isWorking)
                 } footer: {
                     Text(applyFooterText)
                 }
