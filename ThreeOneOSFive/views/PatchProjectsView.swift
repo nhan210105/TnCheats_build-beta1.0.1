@@ -92,6 +92,37 @@ struct PatchProjectsView: View {
         language.text("patch.apply_footer")
     }
 
+    @ToolbarContentBuilder
+    private var patchProjectsToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Menu {
+                if developerModeEnabled {
+                    Button { showCreate = true } label: {
+                        Label(language.text("patch.new"), systemImage: "doc.badge.plus")
+                    }
+                    Button { showImporter = true } label: {
+                        Label(language.text("patch.import"), systemImage: "square.and.arrow.down")
+                    }
+                }
+                Button { showWallpaperImporter = true } label: {
+                    Label(language.text("wallpaper.import"), systemImage: "photo.badge.plus")
+                }
+            } label: {
+                Group {
+                    if store.isBusy || isImportingWallpapers { ProgressView() }
+                    else { Image(systemName: "plus") }
+                }
+            }
+            .disabled(store.isBusy || isImportingWallpapers)
+            .accessibilityLabel(language.text("patch.add"))
+        }
+        AppUtilityToolbar(
+            language: language,
+            onOpenSettings: onOpenSettings,
+            onOpenLogs: onOpenLogs
+        )
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -162,43 +193,7 @@ struct PatchProjectsView: View {
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        if developerModeEnabled {
-                            Button {
-                                showCreate = true
-                            } label: {
-                                Label(language.text("patch.new"), systemImage: "doc.badge.plus")
-                            }
-                            Button {
-                                showImporter = true
-                            } label: {
-                                Label(language.text("patch.import"), systemImage: "square.and.arrow.down")
-                            }
-                        }
-                        Button {
-                            showWallpaperImporter = true
-                        } label: {
-                            Label(
-                                language.text("wallpaper.import"),
-                                systemImage: "photo.badge.plus"
-                            )
-                        }
-                    } label: {
-                        if store.isBusy || isImportingWallpapers {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "plus")
-                        }
-                    }
-                    .disabled(store.isBusy || isImportingWallpapers)
-                    .accessibilityLabel(language.text("patch.add"))
-                }
-                AppUtilityToolbar(
-                    language: language,
-                    onOpenSettings: onOpenSettings,
-                    onOpenLogs: onOpenLogs
-                )
+                patchProjectsToolbarContent
             }
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
@@ -598,6 +593,17 @@ struct PatchUnlockView: View {
     let request: PatchPasswordRequest
     @State private var password = ""
 
+    @ToolbarContentBuilder
+    private var patchUnlockToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button(language.text("common.cancel")) { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button(language.text("patch.unlock"), action: unlock)
+                .disabled(password.isEmpty || store.isBusy)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -628,13 +634,7 @@ struct PatchUnlockView: View {
             .navigationTitle(language.text("patch.unlock"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(language.text("common.cancel")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(language.text("patch.unlock"), action: unlock)
-                        .disabled(password.isEmpty || store.isBusy)
-                }
+                patchUnlockToolbarContent
             }
         }
     }
@@ -740,254 +740,231 @@ struct PatchProjectDetailView: View {
         language.text("patch.reset_confirm_message")
     }
 
-    var body: some View {
-        detailList
-            .listStyle(.insetGrouped)
-            .navigationTitle(item?.project?.name ?? language.text("patch.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { detailToolbar }
-            .sheet(isPresented: $showEditor) {
-                editorSheet
-            }
-            .sheet(item: $editingRule) { rule in
-                PatchRuleEditorView(rule: rule) { updatedRule in
-                    updateRule(updatedRule)
-                }
-            }
-            .confirmationDialog(
-                language.text("patch.apply_confirm_title"),
-                isPresented: $showApplyConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(language.text("patch.apply")) { apply() }
-                Button(language.text("common.cancel"), role: .cancel) { }
-            } message: {
-                Text(verbatim: applyConfirmationMessage)
-            }
-            .confirmationDialog(
-                language.text("patch.restore_confirm_title"),
-                isPresented: $showRestoreConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(language.text("patch.restore"), role: .destructive) { prepareRestore() }
-                Button(language.text("common.cancel"), role: .cancel) { }
-            } message: {
-                Text(verbatim: restoreConfirmationMessage)
-            }
-            .confirmationDialog(
-                language.text("patch.restore_changed_title"),
-                isPresented: $showChangedRestoreConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(language.text("patch.restore_changed_action"), role: .destructive) {
-                    restore(allowChangedTargets: true)
-                }
-                Button(language.text("common.cancel"), role: .cancel) { }
-            } message: {
-                Text(verbatim: changedRestoreMessage)
-            }
-            .confirmationDialog(
-                language.text("patch.reset_confirm_title"),
-                isPresented: $showResetConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(language.text("patch.reset"), role: .destructive) { resetToAppliedState() }
-                Button(language.text("common.cancel"), role: .cancel) { }
-            } message: {
-                Text(verbatim: resetConfirmationMessage)
-            }
-            .alert(item: $actionAlert) { alert in
-                Alert(
-                    title: Text(verbatim: language.text(alert.titleKey)),
-                    message: Text(verbatim: alert.message(language: language)),
-                    dismissButton: .default(Text(verbatim: language.text("common.ok")))
-                )
-            }
-            .sheet(item: $shareRequest) { request in
-                PatchActivityView(items: [request.url])
-                    .ignoresSafeArea()
-            }
-    }
-
-    private var detailList: some View {
-        List {
-            if let item, let project = item.project {
-                projectInformationSection(item: item, project: project)
-                projectContentSection(item: item, project: project)
-                projectPasswordSection(item: item)
-                projectActionsSection(item: item)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func projectInformationSection(item: PatchLibraryItem, project: PatchProject) -> some View {
-        Section(language.text("patch.information")) {
-            if !project.author.isEmpty {
-                patchInfoRow(label: language.text("patch.author"), value: project.author)
-            }
-            patchInfoRow(label: language.text("patch.privacy")) {
-                Label(
-                    language.text(project.isPrivate ? "patch.private" : "patch.public"),
-                    systemImage: project.isPrivate ? "eye.slash.fill" : "eye"
-                )
-                .foregroundStyle(project.isPrivate ? AppTheme.accent : Color.secondary)
-            }
-            if let origin = item.origin {
-                patchInfoRow(
-                    label: language.text("repository.source"),
-                    value: origin.repositoryName
-                )
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func projectContentSection(item: PatchLibraryItem, project: PatchProject) -> some View {
-        if project.isPrivate && !item.canInspectContents {
-            Section {
-                VStack(spacing: 10) {
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 30, weight: .medium))
-                        .foregroundStyle(AppTheme.accent)
-                    Text(verbatim: language.text("patch.private_hidden_title"))
-                        .font(.headline)
-                    Text(verbatim: language.text("patch.private_hidden_message"))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-            }
-        } else if isWorkspaceProject {
-            workspaceSection(item: item, project: project)
-        } else {
-            legacyRulesSection(project: project)
-        }
-    }
-
-    private func workspaceSection(item: PatchLibraryItem, project: PatchProject) -> some View {
-        Section {
-            ForEach(project.allBundleIdentifiers, id: \.self) { bundleID in
-                workspaceBundleIDRow(bundleID)
-            }
-            LabeledContent(language.text("patch.files")) {
-                Text(verbatim: String(project.rules.count))
-            }
-            LabeledContent(language.text("patch.folders")) {
-                Text(verbatim: String(project.directories.count))
-            }
-            if let workspaceURL = item.workspaceURL {
-                NavigationLink {
-                    FileBrowserView(
-                        containerPath: workspaceURL.path,
-                        title: project.name,
-                        bundleID: nil
-                    )
-                } label: {
-                    Label(language.text("patch.open_workspace"), systemImage: "folder")
-                }
-            }
-        } header: {
-            Text(verbatim: language.text("patch.workspace"))
-        } footer: {
-            Text(verbatim: language.text("patch.workspace_detail_footer"))
-        }
-    }
-
-    private func legacyRulesSection(project: PatchProject) -> some View {
-        Section {
-            ForEach(project.rules) { rule in
-                Button {
-                    editingRule = rule
-                } label: {
-                    PatchRuleRow(rule: rule)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint(language.text("patch.edit_rule_hint"))
-            }
-        } header: {
-            Text(verbatim: language.text("patch.rules"))
-        } footer: {
-            Text(verbatim: language.text("patch.legacy_footer"))
-        }
-    }
-
-    private func projectPasswordSection(item: PatchLibraryItem) -> some View {
-        Section(language.text("patch.password")) {
-            HStack(spacing: 12) {
-                Image(systemName: item.summary.isPasswordProtected ? "lock.fill" : "lock.open")
-                    .foregroundStyle(AppTheme.accent)
-                    .frame(width: 24)
-                Text(verbatim: language.text(
-                    item.summary.isPasswordProtected ? "patch.password_locked" : "patch.no_password"
-                ))
-                .font(.subheadline)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func projectActionsSection(item: PatchLibraryItem) -> some View {
-        Section {
-            Button {
-                showApplyConfirmation = true
-            } label: {
-                actionLabel("patch.apply", systemImage: "checkmark.shield.fill")
-            }
-            .disabled(isWorking || receipt != nil)
-
-            if receipt != nil {
-                Button {
-                    showResetConfirmation = true
-                } label: {
-                    actionLabel("patch.reset", systemImage: "arrow.counterclockwise.circle")
-                }
-                .disabled(isWorking)
-
-                Button(role: .destructive) {
-                    showRestoreConfirmation = true
-                } label: {
-                    actionLabel("patch.restore", systemImage: "arrow.uturn.backward.circle")
-                }
-                .disabled(isWorking)
-            }
-
-            if developerModeEnabled {
-                Button(action: prepareExport) {
-                    actionLabel("patch.export", systemImage: "square.and.arrow.up")
-                }
-            }
-        } footer: {
-            Text(verbatim: applyFooterText)
-        }
-        .disabled(isWorking)
-    }
-
-    @ViewBuilder
-    private var detailToolbar: some ToolbarContent {
+    @ToolbarContentBuilder
+    private var patchDetailToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             if isWorking {
                 ProgressView()
             } else if developerModeEnabled, !isWorkspaceProject, item?.canInspectContents == true {
-                Button(language.text("patch.edit")) {
-                    showEditor = true
-                }
-                .disabled(item?.project == nil)
+                Button(language.text("patch.edit")) { showEditor = true }
+                    .disabled(item?.project == nil)
             }
         }
     }
 
-    @ViewBuilder
-    private var editorSheet: some View {
-        if let item, let project = item.project {
-            PatchProjectEditorView(
-                existingProject: project,
-                passwordIsProtected: item.summary.isPasswordProtected
-            ) { updatedProject, _ in
-                store.update(project: updatedProject)
+    var body: some View {
+        List {
+            if let item, let project = item.project {
+                Section(language.text("patch.information")) {
+                    if !project.author.isEmpty {
+                        patchInfoRow(
+                            label: language.text("patch.author"),
+                            value: project.author
+                        )
+                    }
+                    patchInfoRow(label: language.text("patch.privacy")) {
+                        Label(
+                            language.text(project.isPrivate
+                                ? "patch.private"
+                                : "patch.public"),
+                            systemImage: project.isPrivate
+                                ? "eye.slash.fill"
+                                : "eye"
+                        )
+                        .foregroundStyle(project.isPrivate ? AppTheme.accent : Color.secondary)
+                    }
+                    if let origin = item.origin {
+                        patchInfoRow(
+                            label: language.text("repository.source"),
+                            value: origin.repositoryName
+                        )
+                    }
+                }
+
+                if project.isPrivate && !item.canInspectContents {
+                    Section {
+                        VStack(spacing: 10) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 30, weight: .medium))
+                                .foregroundStyle(AppTheme.accent)
+                            Text(language.text("patch.private_hidden_title"))
+                                .font(.headline)
+                            Text(language.text("patch.private_hidden_message"))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                    }
+                } else if isWorkspaceProject {
+                    Section {
+                        ForEach(project.allBundleIdentifiers, id: \.self) { bundleID in
+                            workspaceBundleIDRow(bundleID)
+                        }
+                        LabeledContent(language.text("patch.files")) {
+                            Text("\(project.rules.count)")
+                        }
+                        LabeledContent(language.text("patch.folders")) {
+                            Text("\(project.directories.count)")
+                        }
+                        if let workspaceURL = item.workspaceURL {
+                            NavigationLink {
+                                FileBrowserView(
+                                    containerPath: workspaceURL.path,
+                                    title: project.name,
+                                    bundleID: nil
+                                )
+                            } label: {
+                                Label(
+                                    language.text("patch.open_workspace"),
+                                    systemImage: "folder"
+                                )
+                            }
+                        }
+                    } header: {
+                        Text(language.text("patch.workspace"))
+                    } footer: {
+                        Text(language.text("patch.workspace_detail_footer"))
+                    }
+                } else {
+                    Section {
+                        ForEach(project.rules) { rule in
+                            Button {
+                                editingRule = rule
+                            } label: {
+                                PatchRuleRow(rule: rule)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(language.text("patch.edit_rule_hint"))
+                        }
+                    } header: {
+                        Text(language.text("patch.rules"))
+                    } footer: {
+                        Text(language.text("patch.legacy_footer"))
+                    }
+                }
+
+                Section(language.text("patch.password")) {
+                    HStack(spacing: 12) {
+                        Image(systemName: item.summary.isPasswordProtected ? "lock.fill" : "lock.open")
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Text(language.text(item.summary.isPasswordProtected
+                            ? "patch.password_locked"
+                            : "patch.no_password"))
+                            .font(.subheadline)
+                    }
+                }
+
+                Section {
+                    Button {
+                        showApplyConfirmation = true
+                    } label: {
+                        actionLabel("patch.apply", systemImage: "checkmark.shield.fill")
+                    }
+                    .disabled(isWorking || receipt != nil)
+
+                    if receipt != nil {
+                        Button {
+                            showResetConfirmation = true
+                        } label: {
+                            actionLabel("patch.reset", systemImage: "arrow.counterclockwise.circle")
+                        }
+                        .disabled(isWorking)
+
+                        Button(role: .destructive) {
+                            showRestoreConfirmation = true
+                        } label: {
+                            actionLabel("patch.restore", systemImage: "arrow.uturn.backward.circle")
+                        }
+                        .disabled(isWorking)
+                    }
+
+                    if developerModeEnabled {
+                        Button(action: prepareExport) {
+                            actionLabel("patch.export", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    .disabled(isWorking)
+                } footer: {
+                    Text(applyFooterText)
+                }
             }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(item?.project?.name ?? language.text("patch.title"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            patchDetailToolbarContent
+        }
+        .sheet(isPresented: $showEditor) {
+            if let item, let project = item.project {
+                PatchProjectEditorView(
+                    existingProject: project,
+                    passwordIsProtected: item.summary.isPasswordProtected
+                ) { updatedProject, _ in
+                    store.update(project: updatedProject)
+                }
+            }
+        }
+        .sheet(item: $editingRule) { rule in
+            PatchRuleEditorView(rule: rule) { updatedRule in
+                updateRule(updatedRule)
+            }
+        }
+        .confirmationDialog(
+            language.text("patch.apply_confirm_title"),
+            isPresented: $showApplyConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(language.text("patch.apply")) { apply() }
+            Button(language.text("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(verbatim: applyConfirmationMessage)
+        }
+        .confirmationDialog(
+            language.text("patch.restore_confirm_title"),
+            isPresented: $showRestoreConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(language.text("patch.restore"), role: .destructive) { prepareRestore() }
+            Button(language.text("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(verbatim: restoreConfirmationMessage)
+        }
+        .confirmationDialog(
+            language.text("patch.restore_changed_title"),
+            isPresented: $showChangedRestoreConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(language.text("patch.restore_changed_action"), role: .destructive) {
+                restore(allowChangedTargets: true)
+            }
+            Button(language.text("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(verbatim: changedRestoreMessage)
+        }
+        .confirmationDialog(
+            language.text("patch.reset_confirm_title"),
+            isPresented: $showResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(language.text("patch.reset"), role: .destructive) { resetToAppliedState() }
+            Button(language.text("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(verbatim: resetConfirmationMessage)
+        }
+        .alert(item: $actionAlert) { alert in
+            Alert(
+                title: Text(language.text(alert.titleKey)),
+                message: Text(alert.message(language: language)),
+                dismissButton: .default(Text(language.text("common.ok")))
+            )
+        }
+        .sheet(item: $shareRequest) { request in
+            PatchActivityView(items: [request.url])
+                .ignoresSafeArea()
         }
     }
 
